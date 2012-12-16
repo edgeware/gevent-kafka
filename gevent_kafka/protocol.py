@@ -118,6 +118,8 @@ def _decode_messages(data):
         if len(payload) != msgsize:
             if not messages:
                 print "first message was cropped! max_size set too small?"
+                raise InvalidFetchSizeError("%d > %d" % (msgsize,
+                                                         len(payload)))
             break
         data = newdata
 
@@ -128,8 +130,8 @@ def _decode_messages(data):
             for message in decompressed:
                 messages.append(message)
         elif magic and compression != 0:
-            raise InvalidMessageError("invalid message")
             print "unsupported compression codec", compression
+            raise InvalidMessageError("invalid message")
         else:
             messages.append(payload)
 
