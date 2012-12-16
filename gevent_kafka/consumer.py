@@ -25,7 +25,8 @@ import gevent
 
 from gevent_zookeeper.monitor import MonitorListener
 
-from gevent_kafka.protocol import OffsetOutOfRangeError, InvalidMessageError
+from gevent_kafka.protocol import (OffsetOutOfRangeError, InvalidMessageError,
+                                   InvalidFetchSizeError)
 from gevent_kafka.broker import LATEST, EARLIEST
 from gevent_kafka import broker
 
@@ -97,7 +98,7 @@ class ConsumedTopic(object):
 
     def do_rebalance(self):
         """Rebalance the group."""
-        pt = ['%s-%s' % (bid, n) 
+        pt = ['%s-%s' % (bid, n)
               for (bid, np) in self.partitions.items()
               for n in range(np)]
         cg = [cid for cid in self.consumer.clients.keys()]
@@ -190,7 +191,7 @@ class ConsumedTopic(object):
             try:
                 messages, delta = broker.fetch(self.topic_name, partno,
                     self.offsets[bpid], self.max_size)
-            except InvalidMessageError:
+            except (InvalidMessageError, InvalidFetchSizeError):
                 offsets = broker.offsets(self.topic_name, partno, LATEST)
                 self.offsets[bpid] = offsets[-1]
                 continue
