@@ -15,9 +15,11 @@
 from collections import defaultdict
 import logging
 import json
+import os
 import random
 import time
 import zookeeper
+from kazoo.client import KazooClient
 
 from gevent.queue import Queue
 from gevent import socket
@@ -29,6 +31,28 @@ from gevent_kafka.protocol import (OffsetOutOfRangeError, InvalidMessageError,
                                    InvalidFetchSizeError)
 from gevent_kafka.broker import LATEST, EARLIEST
 from gevent_kafka import broker
+
+
+def zkmonitor(kazoo, path, into, watch, factory=json.loads):
+    def child_changed(e):
+        print "child changed"
+        print e
+        watch()
+        get_child(os.path.basename(e.path))
+
+    def get_child(child):
+        child_path = os.path.join(path, child)
+        data, stat = kazoo.get(child_path, watch=child_changed)
+        print "got child"
+        print data
+        into[child] = factory(data)
+
+    def get_children(e=None):
+        children = kazoo.get_children(path, watch=get_children)
+        for child in children:
+            get_child(child)
+
+    get_children()
 
 
 def sleep_interval(t0, t1, interval):
@@ -54,6 +78,8 @@ class Rebalancer(MonitorListener):
     def deleted(self, child):
         self.consumer.rebalance()
 
+    def __call__(self, *args):
+        self.consumer.rebalance()
 
 class ConsumedTopic(object):
     """A consumed topic."""
@@ -125,9 +151,9 @@ class ConsumedTopic(object):
                 gevent.kill(greenlet)
 
             # Step 2. Remove the owner node from the group.
-            self.framework.delete().for_path(
-                '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
-                    self.topic_name, to_remove))
+            owner_path = '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
+                         self.topic_name, to_remove)
+            self.framework.delete().for_path(owner_path)
             self.owned.remove(to_remove)
 
             # Step 3. We remove the offsets entry so that we re-read
@@ -255,8 +281,9 @@ class Consumer(object):
 
     _STOP_REQUEST = u'stop-request'
 
-    def __init__(self, framework, group_id, consumer_id=None):
+    def __init__(self, framework, group_id, kazoo, consumer_id=None):
         self.framework = framework
+        self.kazoo = kazoo
         self.group_id = group_id
         if consumer_id is None:
             consumer_id = str(random.randint(0, 1000000))
@@ -306,19 +333,25 @@ class Consumer(object):
     def start(self):
         """Start consumer."""
         # Step 1. Create our consumer ID.
-        self.znode = self.framework.create().parents_if_needed().with_data(
-            json.dumps(self.subscribed)).as_ephemeral().for_path(
-            '/consumers/%s/ids/%s' % (self.group_id, self.consumer_id))
+        path = '/consumers/%s/ids/%s' % (self.group_id, self.consumer_id)
+        data = json.dumps(self.subscribed)
+        # self.znode = self.framework.create().parents_if_needed().with_data(
+        #    data).as_ephemeral().for_path(path)
+        self.znode = self.kazoo.create(path, value=data, ephemeral=True, makepath=True)
 
         # Step 2: Start monitoring for consumers of this group.
-        self.framework.monitor().children().using(Rebalancer(
-                self)).store_into(self.clients, json.loads).for_path(
-            '/consumers/%s/ids' % (self.group_id,))
+        consumer_path = '/consumers/%s/ids' % (self.group_id,)
+        rebalance = Rebalancer(self)
+        zkmonitor(self.kazoo, consumer_path,
+                  into=self.clients,
+                  watch=rebalance)
 
         # Step 3: Start monitoring for brokers.
-        self.framework.monitor().children().using(Rebalancer(
-                self)).store_into(self.brokers, broker.broker_factory).for_path(
-            '/brokers/ids')
+        broker_path = '/brokers/ids'
+        zkmonitor(self.kazoo, broker_path,
+                  into=self.brokers,
+                  watch=rebalance,
+                  factory=broker.broker_factory)
 
         # Step 4: Start the global rebalance greenlet.
         self.rebalance_greenlet = gevent.spawn(self._rebalance)

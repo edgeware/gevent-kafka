@@ -16,22 +16,24 @@ import logging
 
 from gevent_kafka import consumer, producer
 from gevent_zookeeper.framework import ZookeeperFramework
+from kazoo.client import KazooClient
+from kazoo.handlers.gevent import SequentialGeventHandler
 import gevent
 
 
-def consume(framework):
+def consume(framework, kazoo):
     def callback(messages):
         for message in messages:
             print message
-    c = consumer.Consumer(framework, 'example-group')
+    c = consumer.Consumer(framework, 'example-group', kazoo)
     c.start()
     c.subscribe('test', 0.200).start(callback)
     while True:
         gevent.sleep(5)
 
 
-def produce(framework):
-    p = producer.Producer(framework, 'test')
+def produce(framework, kazoo):
+    p = producer.Producer(framework, 'test', kazoo)
     p.start()
 
     while True:
@@ -42,10 +44,12 @@ def produce(framework):
 logging.basicConfig(level=logging.DEBUG)
 
 framework = ZookeeperFramework('localhost:2181', 10)
+kazoo = KazooClient(handler=SequentialGeventHandler())
+kazoo.start()
 framework.connect()
 
-gevent.spawn(consume, framework)
-gevent.spawn(produce, framework)
+gevent.spawn(consume, framework, kazoo)
+gevent.spawn(produce, framework, kazoo)
 
 while True:
     gevent.sleep(10)
