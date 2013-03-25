@@ -17,14 +17,12 @@ import logging
 import json
 import random
 import time
-import zookeeper
+
 from kazoo.exceptions import (NoNodeError, NodeExistsError, ZookeeperError)
 
 from gevent.queue import Queue
 from gevent import socket
 import gevent
-
-from gevent_zookeeper.monitor import MonitorListener
 
 from gevent_kafka.protocol import (OffsetOutOfRangeError, InvalidMessageError,
                                    InvalidFetchSizeError)
@@ -152,7 +150,7 @@ class ConsumedTopic(object):
                                   value=self.consumer.consumer_id,
                                   ephemeral=True, makepath=True)
 
-            except zookeeper.NodeExistsException:
+            except NodeExistsError:
                 self.log.info('%s: failed to create ownership' % (partition,))
                 fail = True
                 continue
