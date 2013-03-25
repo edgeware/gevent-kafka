@@ -25,7 +25,7 @@ def consume(framework, kazoo):
     def callback(messages):
         for message in messages:
             print message
-    c = consumer.Consumer(framework, 'example-group', kazoo)
+    c = consumer.Consumer(kazoo, 'example-group')
     c.start()
     c.subscribe('test', 0.200).start(callback)
     while True:
@@ -33,10 +33,11 @@ def consume(framework, kazoo):
 
 
 def produce(framework, kazoo):
-    p = producer.Producer(framework, 'test', kazoo)
+    p = producer.Producer(kazoo, 'test')
     p.start()
 
     while True:
+        print "sending message"
         p.send(["hello there on the other side"])
         gevent.sleep(2)
 

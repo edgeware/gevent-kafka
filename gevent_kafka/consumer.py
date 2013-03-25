@@ -15,11 +15,10 @@
 from collections import defaultdict
 import logging
 import json
-import os
 import random
 import time
 import zookeeper
-from kazoo.client import KazooClient
+from kazoo.exceptions import (NoNodeError, NodeExistsError, ZookeeperError)
 
 from gevent.queue import Queue
 from gevent import socket
@@ -31,28 +30,7 @@ from gevent_kafka.protocol import (OffsetOutOfRangeError, InvalidMessageError,
                                    InvalidFetchSizeError)
 from gevent_kafka.broker import LATEST, EARLIEST
 from gevent_kafka import broker
-
-
-def zkmonitor(kazoo, path, into, watch, factory=json.loads):
-    def child_changed(e):
-        print "child changed"
-        print e
-        watch()
-        get_child(os.path.basename(e.path))
-
-    def get_child(child):
-        child_path = os.path.join(path, child)
-        data, stat = kazoo.get(child_path, watch=child_changed)
-        print "got child"
-        print data
-        into[child] = factory(data)
-
-    def get_children(e=None):
-        children = kazoo.get_children(path, watch=get_children)
-        for child in children:
-            get_child(child)
-
-    get_children()
+from gevent_kafka.monitor import zkmonitor
 
 
 def sleep_interval(t0, t1, interval):
@@ -84,9 +62,9 @@ class Rebalancer(MonitorListener):
 class ConsumedTopic(object):
     """A consumed topic."""
 
-    def __init__(self, framework, consumer, topic, polling_interval=2,
+    def __init__(self, kazoo, consumer, topic, polling_interval=2,
                  max_size=1048576, retries=3, time=time.time, drain=False):
-        self.framework = framework
+        self.kazoo = kazoo
         self.consumer = consumer
         self.topic_name = topic
         self.partitions = {}
@@ -153,7 +131,7 @@ class ConsumedTopic(object):
             # Step 2. Remove the owner node from the group.
             owner_path = '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
                          self.topic_name, to_remove)
-            self.framework.delete().for_path(owner_path)
+            self.kazoo.delete(owner_path)
             self.owned.remove(to_remove)
 
             # Step 3. We remove the offsets entry so that we re-read
@@ -167,10 +145,13 @@ class ConsumedTopic(object):
         fail = False
         for partition in (set(partitions) - set(self.owned)):
             try:
-                self.framework.create().as_ephemeral().with_data(
-                    self.consumer.consumer_id).parents_if_needed().for_path(
-                        '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
-                            self.topic_name, partition))
+                consumer_path = '/consumers/%s/owners/%s/%s' % (
+                                self.consumer.group_id,
+                                self.topic_name, partition)
+                self.kazoo.create(consumer_path,
+                                  value=self.consumer.consumer_id,
+                                  ephemeral=True, makepath=True)
+
             except zookeeper.NodeExistsException:
                 self.log.info('%s: failed to create ownership' % (partition,))
                 fail = True
@@ -184,17 +165,19 @@ class ConsumedTopic(object):
                     self._reader, partition, self.consumer.brokers[broker_id],
                     int(part_id))
 
-        return fail != True
+        return fail is not True
 
     def update_offset(self, part, offset):
         """Write consumed offset for the given partition."""
+        data = str(offset)
+        consumer_offset_path = '/consumers/%s/offsets/%s/%s' % (
+                               self.consumer.group_id,
+                               self.topic_name, part)
         try:
-            self.framework.set().parents_if_needed().create_if_needed(
-                ).with_data(str(offset)).for_path(
-                '/consumers/%s/offsets/%s/%s' % (self.consumer.group_id,
-                                                 self.topic_name, part))
-        except zookeeper.ZooKeeperException as e:
-            self.log.error("could not write offset: %r" % e)
+            self.kazoo.ensure_path(consumer_offset_path)
+            self.kazoo.set(consumer_offset_path, data)
+        except zookeeper.ZookeeperError:
+            self.log.exception("could not write offset")
 
     def _reader(self, bpid, broker, partno):
         """Background greenlet for reading content from partitions."""
@@ -204,11 +187,12 @@ class ConsumedTopic(object):
         # the broker to get the _latest_ message.
         if bpid not in self.offsets:
             try:
-                data = self.framework.get().for_path(
-                    '/consumers/%s/offsets/%s/%s' % (self.consumer.group_id,
-                    self.topic_name, bpid))
+                consumer_path = '/consumers/%s/offsets/%s/%s' % (
+                                self.consumer.group_id,
+                                self.topic_name, bpid)
+                data, stat = self.kazoo.get(consumer_path)
                 data = int(data or 0)
-            except zookeeper.NoNodeException:
+            except NoNodeError:
                 offsets = broker.offsets(self.topic_name, partno, LATEST)
                 data = offsets[-1]
 
@@ -250,19 +234,22 @@ class ConsumedTopic(object):
         """Start consuming the topic."""
         self.callback = callback
         self.consumer._add_topic(self.topic_name, self)
-        self.monitor = self.framework.monitor().children().using(
-            Rebalancer(self)).store_into(self.partitions, int).for_path(
-                '/brokers/topics/%s' % (self.topic_name,))
+        partitions_path = '/brokers/topics/%s' % (self.topic_name,)
+        zkmonitor(self.kazoo, partitions_path,
+                  into=self.partitions,
+                  watch=Rebalancer(self),
+                  factory=int)
         self.rebalance_greenlet = gevent.spawn(self._rebalance)
 
     def close(self):
         """Stop consuming the topic."""
-        self.monitor.close()
+        #self.monitor.close()
         self.consumer._remove_topic(self.topic_name, self)
         for owned in self.owned:
-            self.framework.delete().for_path(
-                '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
-                    self.topic_name, owned))
+            path = '/consumers/%s/owners/%s/%s' % (
+                   self.consumer.group_id,
+                   self.topic_name, owned)
+            self.kazoo.delete(path)
 
 
 class Consumer(object):
@@ -281,8 +268,7 @@ class Consumer(object):
 
     _STOP_REQUEST = u'stop-request'
 
-    def __init__(self, framework, group_id, kazoo, consumer_id=None):
-        self.framework = framework
+    def __init__(self, kazoo, group_id, consumer_id=None):
         self.kazoo = kazoo
         self.group_id = group_id
         if consumer_id is None:
@@ -313,8 +299,8 @@ class Consumer(object):
         self.rebalanceq.put(None)
 
     def update_topics(self):
-        self.framework.set().with_data(json.dumps(
-                self.subscribed)).for_path(self.znode)
+        data = json.dumps(self.subscribed)
+        self.kazoo.set(self.znode, data)
 
     def _add_topic(self, topic_name, topic):
         # Add topic and update stuff.
@@ -370,5 +356,5 @@ class Consumer(object):
 
         @return: a L{ConsumedTopic}.
         """
-        return ConsumedTopic(self.framework, self, topic_name,
+        return ConsumedTopic(self.kazoo, self, topic_name,
             polling_interval, max_size)
