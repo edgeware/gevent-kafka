@@ -15,6 +15,7 @@
 import random
 
 from gevent_kafka import broker
+from gevent_kafka.monitor import zkmonitor
 
 
 class NoBrokersAvailableError(Exception):
@@ -39,8 +40,8 @@ class Producer(object):
         be sent.
     """
 
-    def __init__(self, framework, topic, partitioner=None):
-        self.framework = framework
+    def __init__(self, kazoo, topic, partitioner=None):
+        self.kazoo = kazoo
         self.topic_name = topic
         self.brokers = {}
         self.topic_parts = {}
@@ -48,12 +49,15 @@ class Producer(object):
 
     def start(self):
         """Start the producer."""
-        self.broker_mon = self.framework.monitor().children().store_into(
-            self.brokers, broker.broker_factory).for_path(
-                    '/brokers/ids')
-        self.topic_mon = self.framework.monitor().children().store_into(
-            self.topic_parts, int).for_path('/brokers/topics/%s' % (
-                self.topic_name))
+        broker_path = '/brokers/ids'
+        zkmonitor(self.kazoo, broker_path,
+                  into=self.brokers,
+                  factory=broker.broker_factory)
+
+        topic_path = '/brokers/topics/%s' % (self.topic_name)
+        zkmonitor(self.kazoo, topic_path,
+                  into=self.topic_parts,
+                  factory=int)
 
     def close(self):
         """Stop the producer."""
