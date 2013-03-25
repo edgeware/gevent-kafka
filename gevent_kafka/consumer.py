@@ -37,22 +37,13 @@ def sleep_interval(t0, t1, interval):
         gevent.sleep(dt)
 
 
-class Rebalancer(MonitorListener):
+class Rebalancer(object):
     """Zookeeper framework listener that rebalances a consumer when
     something changes.
     """
 
     def __init__(self, consumer):
         self.consumer = consumer
-
-    def created(self, child, data):
-        self.consumer.rebalance()
-
-    def modified(self, child, data):
-        self.consumer.rebalance()
-
-    def deleted(self, child):
-        self.consumer.rebalance()
 
     def __call__(self, *args):
         self.consumer.rebalance()
