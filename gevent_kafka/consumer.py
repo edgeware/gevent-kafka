@@ -159,9 +159,13 @@ class ConsumedTopic(object):
 
     def update_offset(self, part, offset):
         """Write consumed offset for the given partition."""
-        self.framework.set().parents_if_needed().create_if_needed().with_data(
-            str(offset)).for_path('/consumers/%s/offsets/%s/%s' % (
-                self.consumer.group_id, self.topic_name, part))
+        try:
+            self.framework.set().parents_if_needed().create_if_needed(
+                ).with_data(str(offset)).for_path(
+                '/consumers/%s/offsets/%s/%s' % (self.consumer.group_id,
+                                                 self.topic_name, part))
+        except zookeeper.ConnectionLossException as e:
+            self.log.error("could not write offset: %r" % e)
 
     def _reader(self, bpid, broker, partno):
         """Background greenlet for reading content from partitions."""
