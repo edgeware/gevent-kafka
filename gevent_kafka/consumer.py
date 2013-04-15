@@ -89,8 +89,11 @@ class ConsumedTopic(object):
             if item is Consumer._STOP_REQUEST:
                 break
             for i in range(self.retries):
-                if self.do_rebalance():
-                    break
+                try:
+                    if self.do_rebalance():
+                        break
+                except zookeeper.ZookeeperException as e:
+                    self.log.debug("ZooKeeper error: %s" % e)
                 self.log.info('failed to rebalance: will try again soon')
                 gevent.sleep(2)
             else:
@@ -164,7 +167,7 @@ class ConsumedTopic(object):
                 ).with_data(str(offset)).for_path(
                 '/consumers/%s/offsets/%s/%s' % (self.consumer.group_id,
                                                  self.topic_name, part))
-        except zookeeper.ConnectionLossException as e:
+        except zookeeper.ZooKeeperException as e:
             self.log.error("could not write offset: %r" % e)
 
     def _reader(self, bpid, broker, partno):
