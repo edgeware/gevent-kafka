@@ -1,4 +1,2 @@
 gevent==0.13.6
 kazoo==0.9
-git+git://github.com/edgeware/zc-zookeeper-static.git
-git+git://github.com/edgeware/gevent-zookeeper.git#egg=zookeeper
