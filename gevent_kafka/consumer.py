@@ -162,11 +162,14 @@ class ConsumedTopic(object):
         consumer_offset_path = '/consumers/%s/offsets/%s/%s' % (
                                self.consumer.group_id,
                                self.topic_name, part)
+
         try:
-            self.kazoo.ensure_path(consumer_offset_path)
-            self.kazoo.set(consumer_offset_path, data)
-        except zookeeper.ZookeeperError:
-            self.log.exception("could not write offset")
+            if not self.kazoo.exists(consumer_offset_path):
+                self.kazoo.create(consumer_offset_path, value=data, makepath=True)
+            else:
+                self.kazoo.set(consumer_offset_path, data)
+        except ZookeeperError:
+            self.log.exception('failed to update consumer offset')
 
     def _reader(self, bpid, broker, partno):
         """Background greenlet for reading content from partitions."""
