@@ -92,7 +92,7 @@ class ConsumedTopic(object):
                 try:
                     if self.do_rebalance():
                         break
-                except zookeeper.ZookeeperException as e:
+                except zookeeper.ZooKeeperException as e:
                     self.log.debug("ZooKeeper error: %s" % e)
                 self.log.info('failed to rebalance: will try again soon')
                 gevent.sleep(2)
