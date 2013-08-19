@@ -5,8 +5,6 @@ from kazoo.exceptions import NoNodeError
 
 def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
     def child_changed(e):
-        print "child changed"
-        print e
         if watch:
             watch()
         get_child(os.path.basename(e.path))
@@ -16,13 +14,9 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
         try:
             data, stat = kazoo.get(child_path, watch=child_changed)
         except NoNodeError:
-            print "no node %s" % child_path
             if child in into:
                 del into[child]
-            else:
-                print "Got event on child that does not exist in store or zookeeper"
         else:
-            print "got child %s" % data
             into[child] = factory(data)
 
     def get_children(e=None):
@@ -30,4 +24,5 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
         for child in children:
             get_child(child)
 
+    kazoo.ensure_path(path)
     get_children()
