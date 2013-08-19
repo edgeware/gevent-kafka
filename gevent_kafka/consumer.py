@@ -48,6 +48,7 @@ class Rebalancer(object):
     def __call__(self, *args):
         self.consumer.rebalance()
 
+
 class ConsumedTopic(object):
     """A consumed topic."""
 
@@ -66,7 +67,7 @@ class ConsumedTopic(object):
         self.time = time
         self.rebalanceq = Queue()
         self.log = logging.getLogger('kafka.consumer.%s:%s' % (
-                consumer.group_id, topic))
+            consumer.group_id, topic))
         self.retries = retries
         self.drain = drain
 
@@ -85,7 +86,7 @@ class ConsumedTopic(object):
                 try:
                     if self.do_rebalance():
                         break
-                except zookeeper.ZookeeperException as e:
+                except ZookeeperError as e:
                     self.log.debug("ZooKeeper error: %s" % e)
                 self.log.info('failed to rebalance: will try again soon')
                 gevent.sleep(2)
@@ -118,8 +119,9 @@ class ConsumedTopic(object):
                 gevent.kill(greenlet)
 
             # Step 2. Remove the owner node from the group.
-            owner_path = '/consumers/%s/owners/%s/%s' % (self.consumer.group_id,
-                         self.topic_name, to_remove)
+            owner_path = ('/consumers/%s/owners/%s/%s' %
+                          (self.consumer.group_id,
+                           self.topic_name, to_remove))
             self.kazoo.delete(owner_path)
             self.owned.remove(to_remove)
 
@@ -165,7 +167,8 @@ class ConsumedTopic(object):
 
         try:
             if not self.kazoo.exists(consumer_offset_path):
-                self.kazoo.create(consumer_offset_path, value=data, makepath=True)
+                self.kazoo.create(consumer_offset_path, value=data,
+                                  makepath=True)
             else:
                 self.kazoo.set(consumer_offset_path, data)
         except ZookeeperError:
@@ -313,9 +316,8 @@ class Consumer(object):
         # Step 1. Create our consumer ID.
         path = '/consumers/%s/ids/%s' % (self.group_id, self.consumer_id)
         data = json.dumps(self.subscribed)
-        # self.znode = self.framework.create().parents_if_needed().with_data(
-        #    data).as_ephemeral().for_path(path)
-        self.znode = self.kazoo.create(path, value=data, ephemeral=True, makepath=True)
+        self.znode = self.kazoo.create(path, value=data, ephemeral=True,
+                                       makepath=True)
 
         # Step 2: Start monitoring for consumers of this group.
         consumer_path = '/consumers/%s/ids' % (self.group_id,)
@@ -349,4 +351,4 @@ class Consumer(object):
         @return: a L{ConsumedTopic}.
         """
         return ConsumedTopic(self.kazoo, self, topic_name,
-            polling_interval, max_size)
+                             polling_interval, max_size)
