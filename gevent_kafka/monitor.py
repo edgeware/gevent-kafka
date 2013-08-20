@@ -38,6 +38,7 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
                 @kazoo.DataWatch(child_path)
                 def update_child(data, stat, event=None):
                     if event and event.type == EventType.DELETED:
+                        del into[child]
                         return False
                     if watch:
                         watch()

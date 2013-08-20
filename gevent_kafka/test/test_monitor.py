@@ -1,3 +1,27 @@
+# Copyright 2013 Edgeware AB.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Unit tests for ZooKeeper monitor.
+
+Note that these tests use the Kazoo test harness. Therefore they
+require an installation of ZooKeeper and that the environment variable
+"ZOOKEEPER_PATH" points to the location of the ZooKeeper JAR file,
+e.g. "/usr/share/java".
+
+See https://kazoo.readthedocs.org/en/latest/testing.html for more.
+"""
+
 import os
 import time
 import logging
