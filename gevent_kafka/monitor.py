@@ -14,40 +14,34 @@
 
 """Zookeeper monitoring utilities."""
 
-
 import os
 import json
-from kazoo.exceptions import NoNodeError
+from kazoo.protocol.states import EventType
 
 
 def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
     """A ZooKeeper monitor.
 
-    Keeps the gicen dict (into) updated with changes in the children
+    Keeps the given dict (into) updated with changes in the children
     of a given node (path). Optionally adds a callback (watch) and a
-    'factory' function (factory) that gets run on the child data after a
-    change.
+    'factory' function (factory) that gets run on the child data upon
+    changes.
     """
 
-    def child_changed(e):
-        if watch:
-            watch()
-        get_child(os.path.basename(e.path))
-
-    def get_child(child):
-        child_path = os.path.join(path, child)
-        try:
-            data, stat = kazoo.get(child_path, watch=child_changed)
-        except NoNodeError:
-            if child in into:
-                del into[child]
-        else:
-            into[child] = factory(data)
-
-    def get_children(e=None):
-        children = kazoo.get_children(path, get_children)
-        for child in children:
-            get_child(child)
-
     kazoo.ensure_path(path)
-    get_children()
+
+    @kazoo.ChildrenWatch(path)
+    def get_children(children):
+        for child in children:
+            child_path = os.path.join(path, child)
+            if child not in into.keys():
+                @kazoo.DataWatch(child_path)
+                def update_child(data, stat, event=None):
+                    if event and event.type == EventType.DELETED:
+                        return False
+                    if watch:
+                        watch()
+                    into[child] = factory(data)
+
+        for child in set(into.keys()) - set(children):
+            del into[child]
