@@ -24,11 +24,11 @@ from gevent.queue import Queue
 from gevent import socket
 import gevent
 
+from gevent_kafka import broker
+from gevent_kafka.broker import LATEST, EARLIEST
+from gevent_kafka.monitor import zkmonitor
 from gevent_kafka.protocol import (OffsetOutOfRangeError, InvalidMessageError,
                                    InvalidFetchSizeError)
-from gevent_kafka.broker import LATEST, EARLIEST
-from gevent_kafka import broker
-from gevent_kafka.monitor import zkmonitor
 
 
 def sleep_interval(t0, t1, interval):
@@ -122,7 +122,10 @@ class ConsumedTopic(object):
             owner_path = ('/consumers/%s/owners/%s/%s' %
                           (self.consumer.group_id,
                            self.topic_name, to_remove))
-            self.kazoo.delete(owner_path)
+            try:
+                self.kazoo.delete(owner_path)
+            except NoNodeError:
+                pass  # Node already gone? Never mind then.
             self.owned.remove(to_remove)
 
             # Step 3. We remove the offsets entry so that we re-read
@@ -166,13 +169,12 @@ class ConsumedTopic(object):
                                self.topic_name, part)
 
         try:
-            if not self.kazoo.exists(consumer_offset_path):
-                self.kazoo.create(consumer_offset_path, value=data,
-                                  makepath=True)
-            else:
-                self.kazoo.set(consumer_offset_path, data)
-        except ZookeeperError:
-            self.log.exception('failed to update consumer offset')
+            self.kazoo.create(consumer_offset_path, value=data,
+                              makepath=True)
+        except NodeExistsError:
+            self.kazoo.set(consumer_offset_path, data)
+        except ZookeeperError as e:
+            self.log.exception('failed to update consumer offset: %s' % e)
 
     def _reader(self, bpid, broker, partno):
         """Background greenlet for reading content from partitions."""
@@ -190,6 +192,8 @@ class ConsumedTopic(object):
             except NoNodeError:
                 offsets = broker.offsets(self.topic_name, partno, LATEST)
                 data = offsets[-1]
+            except ZookeeperError as e:
+                self.log.exception('failed to read consumer offset: %s' % e)
 
             self.offsets[bpid] = data
 
@@ -223,7 +227,7 @@ class ConsumedTopic(object):
                         self.drain = False
 
             sleep_interval(t0, self.time(),
-                0 if self.drain else self.polling_interval)
+                           0 if self.drain else self.polling_interval)
 
     def start(self, callback):
         """Start consuming the topic."""
@@ -238,13 +242,15 @@ class ConsumedTopic(object):
 
     def close(self):
         """Stop consuming the topic."""
-        #self.monitor.close()
         self.consumer._remove_topic(self.topic_name, self)
         for owned in self.owned:
             path = '/consumers/%s/owners/%s/%s' % (
                    self.consumer.group_id,
                    self.topic_name, owned)
-            self.kazoo.delete(path)
+            try:
+                self.kazoo.delete(path)
+            except (NoNodeError, ZookeeperError):
+                pass
 
 
 class Consumer(object):
