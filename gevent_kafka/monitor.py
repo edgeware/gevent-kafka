@@ -14,6 +14,7 @@
 
 """Zookeeper monitoring utilities."""
 
+from functools import partial
 import os
 import json
 from kazoo.protocol.states import EventType
@@ -28,6 +29,18 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
     changes.
     """
 
+    def update_child(child, data, stat, event=None):
+        print "child watcher", child, data, event
+        if event and event.type == EventType.DELETED:
+            del into[child]
+            if watch:
+                watch()
+            return False
+        into[child] = factory(data)
+        if watch:
+            watch()
+
+    into.clear()
     kazoo.ensure_path(path)
 
     @kazoo.ChildrenWatch(path)
@@ -35,14 +48,8 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
         for child in children:
             child_path = os.path.join(path, child)
             if child not in into.keys():
-                @kazoo.DataWatch(child_path)
-                def update_child(data, stat, event=None):
-                    if event and event.type == EventType.DELETED:
-                        del into[child]
-                        return False
-                    if watch:
-                        watch()
-                    into[child] = factory(data)
+                kazoo.DataWatch(child_path, partial(update_child, child))
 
+        # # Make sure we clean up any children that shouldn't be there
         for child in set(into.keys()) - set(children):
             del into[child]
