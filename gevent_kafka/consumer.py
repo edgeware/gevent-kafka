@@ -142,11 +142,12 @@ class ConsumedTopic(object):
                 consumer_path = '/consumers/%s/owners/%s/%s' % (
                                 self.consumer.group_id,
                                 self.topic_name, partition)
-                self.kazoo.create(consumer_path,
-                                  value=self.consumer.consumer_id,
-                                  ephemeral=True, makepath=True)
+                self.kazoo.retry(self.kazoo.create,
+                                 consumer_path,
+                                 value=self.consumer.consumer_id,
+                                 ephemeral=True, makepath=True)
 
-            except NodeExistsError:
+            except (NodeExistsError, ZookeeperError):
                 self.log.info('%s: failed to create ownership' % (partition,))
                 fail = True
                 continue
@@ -187,7 +188,7 @@ class ConsumedTopic(object):
                 consumer_path = '/consumers/%s/offsets/%s/%s' % (
                                 self.consumer.group_id,
                                 self.topic_name, bpid)
-                data, stat = self.kazoo.get(consumer_path)
+                data, stat = self.kazoo.retry(self.kazoo.get, consumer_path)
                 data = int(data or 0)
             except NoNodeError:
                 offsets = broker.offsets(self.topic_name, partno, LATEST)
