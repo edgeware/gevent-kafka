@@ -61,8 +61,8 @@ class Producer(object):
 
     def close(self):
         """Stop the producer."""
-        self.broker_mon.close()
-        self.topic_mon.close()
+        # TODO: Check that we're not leaking zkmonitors by not closing
+        # them (they currently don't even have a way to do that.)
 
     def send(self, messages, key=NO_KEY):
         """Send messages to the topic.

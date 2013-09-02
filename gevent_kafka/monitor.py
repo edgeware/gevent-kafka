@@ -33,7 +33,7 @@ def zkmonitor(kazoo, path, into, watch=None, factory=json.loads):
         try:
             if event and event.type == EventType.DELETED:
                 into.pop(child, None)
-                return False
+                return False  # stops the watcher
             into[child] = factory(data)
         finally:
             if watch:

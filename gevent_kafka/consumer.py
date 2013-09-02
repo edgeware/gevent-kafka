@@ -190,13 +190,13 @@ class ConsumedTopic(object):
                                 self.topic_name, bpid)
                 data, stat = self.kazoo.retry(self.kazoo.get, consumer_path)
                 data = int(data or 0)
-                self.offsets[bpid] = data
             except (NoNodeError, ZookeeperError):
                 # TODO: check if there is a possibility of data loss
                 # here in the case of ZK error.
                 offsets = broker.offsets(self.topic_name, partno, LATEST)
                 data = offsets[-1]
-                self.offsets[bpid] = data
+
+            self.offsets[bpid] = data
 
         self.log.info('start consuming %s at %d' % (bpid, self.offsets[bpid]))
 
