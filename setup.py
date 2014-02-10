@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name='gevent-kafka',
-      version='0.0',
+      version='0.2.2',
       description='ApacheKafka bindings for gevent',
       author='Johan Rydberg',
       author_email='johan.rydberg@gmail.com',
