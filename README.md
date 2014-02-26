@@ -1,8 +1,7 @@
 gevent-kafka is a client library for [Apache Kafka](http://incubator.apache.org/kafka/),
 for the [gevent](http://gevent.org) framework.
 
-You also need [gevent-zookeeper](https://github.com/jrydberg/gevent-zookeeper) installed.
-
+You also need Kazoo installed.
 
 # Producers #
 
@@ -10,7 +9,7 @@ The example below sends messages to the `test` topic:
 
     from gevent_kafka import producer
 
-    p = producer.Producer(framework, 'test')
+    p = producer.Producer(kazoo_client, 'test')
     p.start()
 
     while True:
