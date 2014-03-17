@@ -168,11 +168,8 @@ class ConsumedTopic(object):
         consumer_offset_path = '/consumers/%s/offsets/%s/%s' % (
                                self.consumer.group_id,
                                self.topic_name, part)
-
         try:
-            self.kazoo.create(consumer_offset_path, value=data,
-                              makepath=True)
-        except NodeExistsError:
+            self.kazoo.ensure_path(consumer_offset_path)
             self.kazoo.set(consumer_offset_path, data)
         except ZookeeperError as e:
             self.log.exception('failed to update consumer offset: %s' % e)
