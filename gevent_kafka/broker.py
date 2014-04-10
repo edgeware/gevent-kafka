@@ -15,7 +15,6 @@
 
 from gevent_kafka.protocol import KafkaProtocol
 from gevent_kafka import pool
-from gevent import socket
 
 
 LATEST = -1
