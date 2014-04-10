@@ -1,7 +1,7 @@
 gevent-kafka is a client library for [Apache Kafka](http://incubator.apache.org/kafka/),
 for the [gevent](http://gevent.org) framework.
 
-You also need [gevent-zookeeper](https://github.com/jrydberg/gevent-zookeeper) installed.
+You also need [gevent-zookeeper](https://github.com/edgeware/gevent-zookeeper) installed.
 
 
 # Producers #
