@@ -216,7 +216,7 @@ class ConsumedTopic(object):
                 offsets = broker.offsets(self.topic_name, partno, EARLIEST)
                 self.offsets[bpid] = offsets[-1]
                 continue
-            except (socket.error, socket.timeout, socket.herror), e:
+            except (socket.error, socket.timeout, socket.herror):
                 self.log.exception("got exception while fetching messages")
             else:
                 if messages:

@@ -17,7 +17,6 @@
 According to https://cwiki.apache.org/confluence/display/KAFKA/Wire+Format
 """
 
-import gevent
 from gevent.queue import Queue
 from gevent import socket
 import struct
@@ -61,7 +60,7 @@ _ERROR_CODE_EXCEPTIONS = {
     ERROR_INVALID_MESSAGE: InvalidMessageError,
     ERROR_WRONG_PARTITION: WrongPartitionError,
     ERROR_INVALID_FETCH_SIZE: InvalidFetchSizeError
-    }
+}
 
 
 def _possibly_raise_exception(error_code):
@@ -82,6 +81,7 @@ def _encode_produce_request(topic, partition, messages):
     payload = struct.pack("!I", len(messages)) + messages
     return _encode_request(REQUEST_TYPE_PRODUCE, topic, partition,
                            payload)
+
 
 def _encode_message(compression, payload):
     payload = struct.pack("!BBl", 1, compression,
