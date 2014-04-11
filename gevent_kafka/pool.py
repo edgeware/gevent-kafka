@@ -25,7 +25,7 @@ class ConnectionPool(object):
             self.size += 1
             try:
                 new_item = self.create_connection()
-            except:
+            except Exception:
                 self.size -= 1
                 raise
             return new_item
