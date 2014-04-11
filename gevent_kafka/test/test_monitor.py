@@ -26,12 +26,20 @@ import os
 import time
 import logging
 
+try:
+    import unittest2 as unittest
+except ImportError:
+    import unittest
+
 import gevent
 from kazoo.testing import KazooTestCase
 from kazoo.handlers.gevent import SequentialGeventHandler
 from mock import Mock
 
 from gevent_kafka import monitor
+
+has_zookeeper_path = os.environ.get('ZOOKEEPER_PATH', False)
+skip_message = '$ZOOKEEPER_PATH is not set'
 
 
 def keep_trying(fun, exception=AssertionError, timeout=1.0, delay=0.1):
@@ -64,12 +72,14 @@ class GeventKafkaMonitorTestCase(KazooTestCase):
                                        logger=logger)
         self.client.start()
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_creates_path(self):
         """Check that the monitor creates the base node if needed."""
         self.assertFalse(self.client.exists(self.path))
         monitor.zkmonitor(self.client, self.path, {})
         self.assertTrue(self.client.exists(self.path))
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_notices_children(self):
         """Check that new child nodes are noticed."""
         monitor.zkmonitor(self.client, self.path, self.data)
@@ -82,6 +92,7 @@ class GeventKafkaMonitorTestCase(KazooTestCase):
         keep_trying(lambda: self.assertEquals(self.data.get("child1"),
                                               dict(data="foo")))
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_updates_children(self):
         """Check that the monitor notices when a child is updated."""
         self.test_zkmonitor_notices_children()
@@ -94,12 +105,14 @@ class GeventKafkaMonitorTestCase(KazooTestCase):
         keep_trying(lambda: self.assertEquals(self.data.get("child1"),
                                               dict(some="zucchini")))
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_removes_children(self):
         """Check that the monitor removes children that aren't there."""
         self.test_zkmonitor_notices_children()
         self.client.delete(os.path.join(self.path, "child1"))
         keep_trying(lambda: self.assertTrue("child1" not in self.data))
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_runs_watch(self):
         """Verify that the given watch callback is called on changes."""
         watch = Mock()
@@ -110,6 +123,7 @@ class GeventKafkaMonitorTestCase(KazooTestCase):
                         '{"some": "potato"}')
         keep_trying(watch.assert_called_once_with)
 
+    @unittest.skipUnless(has_zookeeper_path, skip_message)
     def test_zkmonitor_uses_factory(self):
         """Check that the factory function is used on data."""
         factory = Mock(return_value=67)

@@ -1,5 +1,11 @@
 #!/usr/bin/env python
+from sys import version_info
 from setuptools import setup, find_packages
+
+tests_require = ['mock==1.0.1']
+
+if version_info < (2, 7):
+    tests_require.append('unittest2==0.5.1')
 
 setup(name='gevent-kafka',
       version='0.2.2',
@@ -13,6 +19,4 @@ setup(name='gevent-kafka',
           'gevent==0.13.8',
           'kazoo==1.2.1'
       ],
-      tests_require=[
-          'mock==1.0.1'
-      ])
+      tests_require=tests_require)
