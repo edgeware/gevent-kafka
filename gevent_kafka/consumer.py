@@ -217,9 +217,13 @@ class ConsumedTopic(object):
                 self.log.exception("got exception while fetching messages")
             else:
                 if messages:
-                    self.callback(messages)
-                    self.offsets[bpid] += delta
-                    self.update_offset(bpid, self.offsets[bpid])
+                    try:
+                        self.callback(messages)
+                    except Exception as e:
+                        self.log.error("Consumer callback failed: %s" % e)
+                    else:
+                        self.offsets[bpid] += delta
+                        self.update_offset(bpid, self.offsets[bpid])
                 else:
                     if self.drain:
                         self.drain = False
