@@ -218,13 +218,10 @@ class ConsumedTopic(object):
             else:
                 if messages:
                     try:
-                        failure = self.callback(messages)
-                        if failure:
-                            self.log.warn("Consumer callback reported failure: %s" % failure)
+                        self.callback(messages)
                     except Exception as e:
                         self.log.error("Consumer callback failed: %s" % e)
-                        failure = True
-                    if not failure:
+                    else:
                         self.offsets[bpid] += delta
                         self.update_offset(bpid, self.offsets[bpid])
                 else:
