@@ -57,7 +57,7 @@ def keep_trying(fun, exception=AssertionError, timeout=1.0, delay=0.1):
             break
 
 
-class GeventKafkaMonitorTestCase(KazooTestCase):
+class GeventKafkaMonitorTestCase(KazooTestCase, unittest.TestCase):
 
     """Unit tests for the ZooKeeper monitor."""
 
