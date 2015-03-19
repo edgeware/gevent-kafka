@@ -16,7 +16,7 @@ setup(name='gevent-kafka',
       packages=find_packages(),
       test_suite='gevent_kafka.test',
       install_requires=[
-          'gevent==1.0',
+          'gevent==1.0.1',
           'kazoo==1.3.1'
       ],
       tests_require=tests_require)
