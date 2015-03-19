@@ -8,7 +8,7 @@ if version_info < (2, 7):
     tests_require.append('unittest2==0.5.1')
 
 setup(name='gevent-kafka',
-      version='0.2.2',
+      version='0.3.0',
       description='Apache Kafka bindings for Gevent',
       author='Johan Rydberg',
       author_email='johan.rydberg@gmail.com',
