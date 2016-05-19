@@ -2,10 +2,10 @@
 from sys import version_info
 from setuptools import setup, find_packages
 
-tests_require = ['mock==1.0.1']
+tests_require = ['mock']
 
 if version_info < (2, 7):
-    tests_require.append('unittest2==0.5.1')
+    tests_require.append('unittest2')
 
 setup(name='gevent-kafka',
       version='0.3.0',
@@ -16,7 +16,7 @@ setup(name='gevent-kafka',
       packages=find_packages(),
       test_suite='gevent_kafka.test',
       install_requires=[
-          'gevent==1.0.1',
-          'kazoo==1.3.1'
+          'gevent>=1.0.1',
+          'kazoo>=1.3.1'
       ],
       tests_require=tests_require)
